@@ -319,7 +319,7 @@ The AI Copilot requires **Ollama** running locally with the **Llama 3** model:
 ```bash
 # Install and start Ollama (download from https://ollama.com)
 ollama pull llama3
-ollama serve
+ollama run llama3
 ```
 
 This makes the Copilot accessible at `http://localhost:11434`. The backend auto-connects to it.
