@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  Brain,
 } from "lucide-react"
 import { useState } from "react"
 
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/live", label: "Live Feed", icon: Radio, hasBadge: true },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/zones", label: "Zone Intelligence", icon: MapPin },
+  { href: "/mlops", label: "Model Retraining", icon: Brain },
 ]
 
 export default function Sidebar() {

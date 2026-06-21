@@ -58,6 +58,12 @@ async def startup_event():
     global VIOLATION_STORE
     print("Initializing Gridlock Intelligence v2.0...")
 
+    # Initialize retraining status
+    app.state.TRAINING_STATUS = {
+        "status": "idle",
+        "error": None
+    }
+
     # Load ML pipeline
     if os.path.exists(MODEL_PATH):
         try:
@@ -159,6 +165,47 @@ async def api_get_heatmap(
 
 
 # 3. MLOps Hot-Swap
+@app.get("/api/model-status")
+async def api_model_status():
+    try:
+        if not hasattr(app.state, "ACTIVE_PIPELINE"):
+            return {
+                "status": "inactive",
+                "detail": "ML Pipeline is not initialized.",
+                "training_status": getattr(app.state, "TRAINING_STATUS", {"status": "idle"})
+            }
+        
+        pipeline = app.state.ACTIVE_PIPELINE
+        
+        # Detect model step
+        model_type = "Unknown"
+        if hasattr(pipeline, "steps"):
+            for step_name, step_obj in pipeline.steps:
+                if step_name in ["model", "classifier", "regressor"]:
+                    model_type = step_obj.__class__.__name__
+                    break
+        
+        file_mod_time = "Unknown"
+        file_size = "Unknown"
+        if os.path.exists(MODEL_PATH):
+            stat = os.stat(MODEL_PATH)
+            file_mod_time = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            file_size = f"{stat.st_size / 1024:.1f} KB"
+            
+        return {
+            "status": "active",
+            "model_type": model_type,
+            "last_updated": file_mod_time,
+            "file_size": file_size,
+            "filepath": MODEL_PATH,
+            "features": ["hour", "day_of_week", "is_weekend", "vehicle_type"],
+            "target": "target_impact",
+            "training_status": getattr(app.state, "TRAINING_STATUS", {"status": "idle"})
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/upload-training-data")
 async def api_upload_training_data(
     background_tasks: BackgroundTasks,

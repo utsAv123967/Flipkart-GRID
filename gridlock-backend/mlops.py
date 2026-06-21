@@ -6,10 +6,11 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
 import xgboost as xgb
 import os
+from datetime import datetime
 
 from ml_engine import MODEL_PATH
 
@@ -17,6 +18,11 @@ def train_and_swap_pipeline(app, file_path: str):
     """Background task to train and hot-swap the model."""
     print(f"Starting MLOps pipeline on {file_path}")
     try:
+        app.state.TRAINING_STATUS = {
+            "status": "training",
+            "start_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "error": None
+        }
         # 1. Load data
         df = pd.read_csv(file_path)
         
@@ -78,9 +84,9 @@ def train_and_swap_pipeline(app, file_path: str):
         xgb_preds = xgb_pipeline.predict(X_test)
         rf_preds = rf_pipeline.predict(X_test)
         
-        # scikit-learn mean_squared_error with squared=False gives RMSE
-        xgb_rmse = mean_squared_error(y_test, xgb_preds, squared=False)
-        rf_rmse = mean_squared_error(y_test, rf_preds, squared=False)
+        # scikit-learn root_mean_squared_error for RMSE
+        xgb_rmse = root_mean_squared_error(y_test, xgb_preds)
+        rf_rmse = root_mean_squared_error(y_test, rf_preds)
         
         print(f"Validation RMSE - XGBoost: {xgb_rmse:.4f}, Random Forest: {rf_rmse:.4f}")
         
@@ -96,8 +102,23 @@ def train_and_swap_pipeline(app, file_path: str):
         app.state.ACTIVE_PIPELINE = champion_pipeline
         print("Hot Swap Complete: ACTIVE_PIPELINE updated in memory.")
         
+        # Update state to success
+        app.state.TRAINING_STATUS = {
+            "status": "success",
+            "last_completed": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "champion_model": champion_name,
+            "xgb_rmse": float(xgb_rmse),
+            "rf_rmse": float(rf_rmse),
+            "error": None
+        }
+        
     except Exception as e:
         print(f"MLOps Pipeline Failed: {str(e)}")
+        app.state.TRAINING_STATUS = {
+            "status": "failed",
+            "last_failed": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "error": str(e)
+        }
     finally:
         # Cleanup uploaded file
         if os.path.exists(file_path):
